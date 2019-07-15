@@ -2,55 +2,152 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
 Metadata:
-  AWS::ServerlessRepo::Application:
-    Name: sqs-dlq
-    Description: This serverless application... TODO
-    Author: James Hood
+  #AWS::ServerlessRepo::Application:
+    #Name: sqs-dlq
+   # Description: This serverless application... TODO
+    #Author: James Hood
     # SPDX License Id, e.g., MIT, MIT-0, Apache-2.0. See https://spdx.org/licenses for more details
-    SpdxLicenseId: TODO
+    #SpdxLicenseId: TODO
     # paths are relative to .aws-sam/build directory
-    LicenseUrl: ../../LICENSE
-    ReadmeUrl: ../../README.md
-    Labels: [serverless]
-    HomePageUrl: https://github.com/jlhood/sqs-dlq
+    #LicenseUrl: LICENSE
+    #ReadmeUrl: README.md
+    #Labels: [serverless]
+    #HomePageUrl: https://github.com/jlhood/sqs-dlq
     # Update the semantic version and run sam publish to publish a new version of your app
-    SemanticVersion: 0.0.1
+    #SemanticVersion: 0.0.2
     # best practice is to use git tags for each release and link to the version tag as your source code URL
-    SourceCodeUrl: https://github.com/jlhood/sqs-dlq/tree/0.0.1
+    #SourceCodeUrl: https://github.com/jlhood/sqs-dlq/tree/0.0.1
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: 
+          default: "SQS default parameters"
+        Parameters: 
+          - DelaySeconds
+          - MaximumMessageSize
+          - MessageRetentionPeriod
+          - ReceiveMessageWaitTimeSeconds
+          - VisibilityTimeout
+          - maxReceiveCount
+      - Label: 
+          default: "Retry feature"
+        Parameters: 
+          - BackoffRate
+          - MaxAttempts
+          - IntervalSeconds
 
 Parameters:
   LogLevel:
     Type: String
     Description: Log level for Lambda function logging, e.g., ERROR, INFO, DEBUG, etc
-    Default: INFO
+    Default: DEBUG
+  DelaySeconds:
+    Description: The time in seconds that the delivery of all messages in the queue
+      is delayed. You can specify an integer value of 0 to 900 (15 minutes).
+    Type: Number
+    Default: 0
+  MaximumMessageSize:
+    Type: Number
+    Description: The limit of how many bytes that a message can contain before Amazon
+      SQS rejects it, 1024 bytes (1 KiB) to 262144 bytes (256 KiB)
+    Default: 262144
+  MessageRetentionPeriod:
+    Description: 'The number of seconds that Amazon SQS retains a message. You can
+      specify an integer value from 60 seconds (1 minute) to 1209600 seconds (14 days). '
+    Type: Number
+    Default: 345600
+  ReceiveMessageWaitTimeSeconds:
+    Description: >-
+      Specifies the duration, in seconds, that the ReceiveMessage action call waits
+      until a message is in the queue in order to include it in the response, as opposed
+      to returning an empty response if a message is not yet available. 1 to 20
+    Type: Number
+    Default: 0
+  VisibilityTimeout:
+    Description: This should be longer than the time it would take to process and
+      delete a message, this should not exceed 12 hours.
+    Type: Number
+    Default: 30
+  maxReceiveCount:
+    Description: The number of times a message is delivered to the source queue before being moved to the dead-letter queue. When the ReceiveCount for a message exceeds the maxReceiveCount for a queue, Amazon SQS moves the message to the dead-letter-queue.
+    Type: Number
+    Default: 1
+  IntervalSeconds:
+    Description: An integer that represents the number of seconds before the first retry attempt. The retry will replay the message from the dead letter queue to the main queue.
+    Type: Number
+    Default: 1
+  MaxAttempts:
+    Description: An integer, representing the maximum number of retry attempts . If the error recurs more times than specified, retries cease. A value of 0 (zero) is permitted and indicates that the error or errors should never be retried.
+    Type: Number
+    Default: 3
+  BackoffRate:
+    Description: An interger that is the multiplier by which the retry interval increases on each attempt
+    Type: Number
+    Default: 2
+  
+
 
 Resources:
-  MyFunction:
+  RetryFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/
-      Handler: myfunction.handler
+      Handler: retry.handler
       Runtime: python3.7
       Tracing: Active
-      Timeout: 60
+      Timeout: !Ref 'VisibilityTimeout'
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt MainQeue.QueueName
+      Events:
+        MySQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt RetryDeadLetterQeue.Arn
+            BatchSize: 1
       Environment:
         Variables:
           LOG_LEVEL: !Ref LogLevel
-          TABLE_NAME: !Ref MyTable
+          SQS_MAIN_URL: !Ref MainQeue
+          INTERVAL_SECONDS: !Ref IntervalSeconds
+          MAX_ATTEMPS: !Ref MaxAttempts
+          BACKOFF_RATE: !Ref BackoffRate
+          MESSAGE_RETENTION_PERIOD: !Ref MessageRetentionPeriod
 
-  MyTable:
-    Type: AWS::Serverless::SimpleTable
+  MainQeue:
+    Type: AWS::SQS::Queue
+    Properties:
+      DelaySeconds: !Ref 'DelaySeconds'
+      MaximumMessageSize: !Ref 'MaximumMessageSize'
+      MessageRetentionPeriod: !Ref 'MessageRetentionPeriod'
+      ReceiveMessageWaitTimeSeconds: !Ref 'ReceiveMessageWaitTimeSeconds'
+      VisibilityTimeout: !Ref 'VisibilityTimeout'
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt 'RetryDeadLetterQeue.Arn'
+        maxReceiveCount: !Ref 'maxReceiveCount'
+  
+  RetryDeadLetterQeue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: !Ref 'VisibilityTimeout'
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt 'DeadLetterQeue.Arn'
+        maxReceiveCount: 1
+  
+  DeadLetterQeue:
+    Type: AWS::SQS::Queue
+
 
 Outputs:
-  MyFunctionName:
+  RetryFunction:
     Description: "Lambda Function Name"
-    Value: !Ref MyFunction
-  MyFunctionArn:
-    Description: "Lambda Function ARN"
-    Value: !GetAtt MyFunction.Arn
-  MyTableName:
-    Description: "Table Name"
-    Value: !Ref MyTable
-  MyTableArn:
-    Description: "Table ARN"
-    Value: !GetAtt MyTable.Arn
+    Value: !Ref RetryFunction
+  MainQeueArn:
+    Description: "Main SQS Queue ARN"
+    Value: !GetAtt MainQeue.Arn
+  RetryDeadLetterQeue:
+    Description: "Retry SQSQueue ARN, managed by the Lambda Function"
+    Value: !GetAtt 'RetryDeadLetterQeue.Arn'
+  DeadLetterQeue:
+    Description: "Retry SQSQueue ARN, managed manually"
+    Value: !GetAtt 'DeadLetterQeue.Arn'
