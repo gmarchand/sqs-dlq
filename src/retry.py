@@ -9,7 +9,6 @@ import config
 import backoff
 
 LOG = lambdalogging.getLogger(__name__)
-CLOUDWATCH = boto3.client('cloudwatch')
 SQS = boto3.client('sqs')
 
 
@@ -38,7 +37,7 @@ def handler(event, context):
         attributes.update({'sqs-dlq-retry-nb': {'StringValue': str(nbRetry), 'DataType': 'Number'}})
 
         LOG.debug("SQS message attributes: %s", attributes)
-        sqs_attributes_cleaner(attributes)
+        _sqs_attributes_cleaner(attributes)
         LOG.debug("SQS message attributes cleaned: %s", attributes)
 
         # Backoff
@@ -55,7 +54,7 @@ def handler(event, context):
         )
 
 
-def sqs_attributes_cleaner(attributes):
+def _sqs_attributes_cleaner(attributes):
     """Transform SQS attributes from Lambda event to SQS message."""
     d = dict.fromkeys(attributes)
     for k in d:

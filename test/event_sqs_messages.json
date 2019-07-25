@@ -3,7 +3,7 @@
         {
             "messageId": "2ac3d0a8-1815-4ed7-aad7-bd5befe90700",
             "receiptHandle": "AQEBJIGbQiRCtXfdtinzgXeK2Bd6Lz37Tj8d6gEof9ESAoMEOVfgkRPFbMdFe8mWHeIdrLCP1uEHPC/t1lRK49Ikb3KMllOVQlVnoLRa+f6NvgGlp7SfLJtqa4uo0dJTEO2SN6bZKfX6laUDc9H448ArIoJq4hqLsJrnANp92xObcmLh9EYfaE9olAAbSH9u/Wp6+7fbEu3pvdJJjbLZIocBIV2VptPVFFNE+ZjVZoMuFqgR1Kn8ce227F3exoqOHZWOtBU+tsQpDkrdX4tcIPyHGxTXBQkCpGd6+WJavCmGPK19DdhF05a2smBjZRBrShO2gFmZxkQg7Z2/Zw9lZwcr51aCfYcWImgbKAury0BnHo32Ffrp7r4X++G1hBAU5TAZ18LJlJmQpaAh9gG61o1kRWy5Ub4R5/KGo5/2swoEhvg=",
-            "body": "Hello World",
+            "body": "Hello world",
             "attributes": {
                 "ApproximateReceiveCount": "1",
                 "SentTimestamp": "1563293665252",
@@ -24,7 +24,7 @@
                     "dataType": "String"
                 },
                 "sqs-dlq-retry-nb": {
-                    "stringValue": "0",
+                    "stringValue": "1",
                     "stringListValues": [],
                     "binaryListValues": [],
                     "dataType": "Number"
